@@ -3,19 +3,6 @@
 // Git: github.com/soliforte
 // Freeware, enjoy. If you do something really cool with it, let me know. Pull requests encouraged
 
-(
-  typeof define === "function" ? function (m) { define("plugin-kestrel-js", m); } :
-  typeof exports === "object" ? function (m) { module.exports = m(); } :
-  function(m){ this.kestrel = m(); }
-)(function () {
-
-  "use strict";
-
-  var exports = {};
-
-  // Flag we're still loading
-  exports.load_complete = 0;
-
 kismet_ui_tabpane.AddTab({
 	id:    'mapid',
 	tabTitle:    'Maps',
@@ -141,33 +128,47 @@ kismet_ui_tabpane.AddTab({
     }
 
     function getOldDevs() {
-      $.getJSON("/devices/last-time/1/devices.json").done(function(devs) {
-        var ssid = ""
-        var type = ""
-        var mac = ""
-        var rssi = ""
-        var manuf = ""
-        var lat = ""
-        var lon = ""
+      $.ajax({
+        url: "/devices/last-time/1/devices.json",
+        dataType: 'json',
+        timeout: 30000,
+        success: function(devs) {
+          var ssid = ""
+          var type = ""
+          var mac = ""
+          var rssi = ""
+          var manuf = ""
+          var lat = ""
+          var lon = ""
           for (var x = 0; x < devs.length; x++) {
             ssid = devs[x]['kismet.device.base.name'];
             type = devs[x]['kismet.device.base.type'];
             mac = devs[x]['kismet.device.base.macaddr'];
-            rssi = devs[x]['kismet.device.base.signal']['kismet.common.signal.max_signal_dbm']; //Last signal dBm
-            manuf = devs[x]['kismet.device.base.manuf']
-            lat = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][1];
-	    lon = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][0];
+            if ('kismet.device.base.signal' in devs[x]) {
+              rssi = devs[x]['kismet.device.base.signal']['kismet.common.signal.last_signal']; //Last signal dBm
+            } else { 
+              rssi = 0; 
+            }
+            manuf = devs[x]['kismet.device.base.manuf'];
+            if ('kismet.device.base.location' in devs[x]) {
+              lat = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][1];
+              lon = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][0];
+            } else { 
+              lat = 0.0; 
+              lon = 0.0; 
+            }
             var device = {SSID: ssid, TYPE: type, MAC: mac, RSSI: rssi, LAT: lat, LON: lon, MANUF: manuf};
             macs.push(device);
-          }// end of for
-        }); //end of getJSON
-      }; //end of getdevs
+          } // end of for
+        } //end of success
+      }); // end of ajax
+    }; //end of getdevs
 
     function addDevs() {
       getDevs();
       var uniqmacs = _.uniq(macs, 'MAC');
       dataCluster.RemoveMarkers();
-      var search = document.getElementsByTagName("input")[0].value;
+      var search = document.getElementById("device_search").value;
       for ( var i in uniqmacs){
         var marker = new PruneCluster.Marker(uniqmacs[i]['LAT'], uniqmacs[i]['LON']);
         marker.data.id = uniqmacs[i]['MAC'];
@@ -254,34 +255,47 @@ kismet_ui_tabpane.AddTab({
 
       //Main routine, this gets devices and plots them
     function getDevs() {
-      $.getJSON("/devices/last-time/-20/devices.json").done(function(devs) {
-        var ssid = ""
-        var type = ""
-        var mac = ""
-        var manuf = ""
-        var rssi = ""
-        var lat = ""
-        var lon = ""
+      let ts = Math.floor(Date.now() / 1000) - 20000;
+
+      $.ajax({
+        url: "/devices/last-time/" + ts + "/devices.json",
+        dataType: 'json',
+        timeout: 30000,
+        success: function(devs) {
+          var ssid = ""
+          var type = ""
+          var mac = ""
+          var manuf = ""
+          var rssi = ""
+          var lat = ""
+          var lon = ""
           for (var x = 0; x < devs.length; x++) {
             ssid = devs[x]['kismet.device.base.name'];
             type = devs[x]['kismet.device.base.type'];
             mac = devs[x]['kismet.device.base.macaddr'];
             manuf = devs[x]['kismet.device.base.manuf']
-            rssi = devs[x]['kismet.device.base.signal']['kismet.common.signal.max_signal_dbm']; //Last signal dBm
-            lat = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][1];
-            lon = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][0];
+            if ('kismet.device.base.signal' in devs[x]) {
+              rssi = devs[x]['kismet.device.base.signal']['kismet.common.signal.last_signal']; //Last signal dBm
+            } else { 
+              rssi = 0; 
+            }
+            if ('kismet.device.base.location' in devs[x]) {
+              lat = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][1];
+              lon = devs[x]['kismet.device.base.location']['kismet.common.location.avg_loc']['kismet.common.location.geopoint'][0];
+            } else { 
+              lat = 0.0; 
+              lon = 0.0; 
+            }
             var device = {SSID: ssid, TYPE: type, MAC: mac, RSSI: rssi, LAT: lat, LON: lon, MANUF: manuf};
             macs.push(device);
-          }// end of for
-        }).fail(function(res){
+          } // end of for
+        },
+        fail: function(res){
           console.log("getDevs failed! ", res)
-        }); //end of getJSON
-      }; //end of getdevs
+        }
+      }); // end of ajax
+    }; //end of getdevs
     }); //end of document.ready
   }, //end of function(div)
    priority:    -998,
  }); //End of createCallback
-// We're done loading
-exports.load_complete = 1;
-return exports;
-});
